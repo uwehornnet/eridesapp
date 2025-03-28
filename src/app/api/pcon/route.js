@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import shopifyServer from "@/lib/shopify.server.js";
+import { parse } from "querystring";
 
 const SHOPIFY_HOST_NAME = process.env.SHOPIFY_HOST_NAME;
 const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
@@ -11,16 +12,21 @@ export async function POST(req) {
 		}
 
 		// OCI-Daten empfangen
-		const ociData = req.body;
+		const ociDataRaw = await req.text();
 
+		// form-urlencoded String in ein Objekt parsen
+		const ociDataParsed = parse(ociDataRaw);
+
+		// OCI-Daten in das gewünschte Format umwandeln
 		const item = {
-			description: ociData["NEW_ITEM-DESCRIPTION"]?.[0],
-			quantity: parseInt(ociData["NEW_ITEM-QUANTITY"]?.[0]) || 1,
-			ean: ociData["NEW_ITEM-EGR_CUSTOMDATA_EAN"]?.[0]?.trim(),
-			price: parseFloat(ociData["NEW_ITEM-PRICE"]?.[0]) || 0,
-			longText: ociData["NEW_ITEM-LONGTEXT_1:132"]?.[0],
-			imageUrl: ociData["NEW_ITEM-ATTACHMENT"]?.[0],
+			description: ociDataParsed["NEW_ITEM-DESCRIPTION[1]"],
+			quantity: parseInt(ociDataParsed["NEW_ITEM-QUANTITY[1]"]) || 1,
+			ean: ociDataParsed["NEW_ITEM-EGR_CUSTOMDATA_EAN[1]"]?.trim(),
+			price: parseFloat(ociDataParsed["NEW_ITEM-PRICE[1]"]) || 0,
+			longText: ociDataParsed["NEW_ITEM-LONGTEXT_1:132[]"],
+			imageUrl: ociDataParsed["NEW_ITEM-ATTACHMENT[1]"],
 		};
+		console.log("Parsed Item:", item);
 
 		const adminSession = {
 			shop: SHOPIFY_HOST_NAME,
@@ -88,7 +94,12 @@ export async function POST(req) {
 		</script>
 	  `;
 
-		return NextResponse.status(200).type("html").send(htmlResponse);
+		return new NextResponse(htmlResponse, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/html",
+			},
+		});
 	} catch (error) {
 		console.error("Error in GET request:", error);
 		const errorHtml = `
@@ -99,7 +110,12 @@ export async function POST(req) {
 		  }, "*");
 		</script>
 	  `;
-		return NextResponse.status(500).type("html").send(errorHtml);
+		return new NextResponse(errorHtml, {
+			status: 200,
+			headers: {
+				"Content-Type": "text/html",
+			},
+		});
 	}
 }
 
@@ -116,9 +132,9 @@ export async function GET(req) {
 		});
 		const products = productResponse.body.products;
 
-		return NextResponse.status(200).json(products);
+		return NextResponse.json(products);
 	} catch (error) {
 		console.error("Error in GET request:", error);
-		return NextResponse.status(500).json({ error: "Fehler bei der Verarbeitung" });
+		return NextResponse.json({ error: "Fehler bei der Verarbeitung" });
 	}
 }
