@@ -4,13 +4,23 @@ import shopifyServer from "@/lib/shopify.server.js";
 const SHOPIFY_HOST_NAME = process.env.SHOPIFY_HOST_NAME;
 const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
+// Mapping für Google Produktkategorien
+const categoryMap = {
+	Tische: "6362", // Furniture > Tables
+	Sitzmöbel: "6356", // Furniture > Chairs (oder 436 für Sofas)
+	Seniorenmöbel: "6356", // Furniture > Chairs (keine spezifische Kategorie)
+	Möbel: "635", // Furniture (allgemein)
+	"Lampen und Leuchten": "419", // Home & Garden > Lighting > Lamps
+	Betten: "291", // Furniture > Beds & Accessories > Beds & Bed Frames
+	Teppiche: "696", // Home & Garden > Decor > Rugs
+};
+
 export async function GET(request) {
 	try {
 		if (!SHOPIFY_HOST_NAME || !SHOPIFY_ADMIN_ACCESS_TOKEN) {
 			return NextResponse.json({ error: "Missing Shopify credentials" }, { status: 500 });
 		}
 
-		// Query-Parameter aus der URL lesen
 		const url = new URL(request.url);
 		const type = url.searchParams.get("type");
 
@@ -20,7 +30,6 @@ export async function GET(request) {
 		};
 		const adminRESTClient = new shopifyServer.clients.Rest({ session: adminSession });
 
-		// Produktdaten abrufen
 		const productResponse = await adminRESTClient.get({
 			path: "products.json",
 			query: {
@@ -38,6 +47,7 @@ export async function GET(request) {
 			products.forEach((product) => {
 				const itemGroupId = product.id;
 				const productLink = `https://${SHOPIFY_HOST_NAME}/products/${product.handle}`;
+				const googleCategory = categoryMap[product.product_type] || "635"; // Fallback: Furniture
 
 				product.variants.forEach((variant) => {
 					const availability =
@@ -60,9 +70,21 @@ export async function GET(request) {
 					}</g:image_link>\n`;
 					xml += `      <link>${productLink}?variant=${variant.id}</link>\n`;
 					xml += `      <g:brand>${escapeXml(product.vendor || "Unbekannt")}</g:brand>\n`;
+					xml += `      <g:google_product_category>${googleCategory}</g:google_product_category>\n`;
 					if (variant.barcode) xml += `      <g:gtin>${variant.barcode}</g:gtin>\n`;
-					if (variant.option1) xml += `      <g:size>${escapeXml(variant.option1)}</g:size>\n`;
-					if (variant.option2) xml += `      <g:color>${escapeXml(variant.option2)}</g:color>\n`;
+
+					// Kategorie-spezifische Attribute
+					if (variant.option1) xml += `      <g:size>${escapeXml(variant.option1)}</g:size>\n`; // Größe (Pflicht für Betten/Teppiche)
+					if (variant.option2) xml += `      <g:color>${escapeXml(variant.option2)}</g:color>\n`; // Farbe
+					if (variant.option3 && product.product_type === "Teppiche") {
+						xml += `      <g:pattern>${escapeXml(variant.option3)}</g:pattern>\n`; // Muster für Teppiche
+					}
+					if (product.product_type.includes("Lampen") && variant.wattage) {
+						xml += `      <g:wattage>${escapeXml(variant.wattage)}</g:wattage>\n`; // Wattzahl für Lampen
+					}
+					// Material könnte aus Metafeldern kommen; hier als Platzhalter
+					if (variant.material) xml += `      <g:material>${escapeXml(variant.material)}</g:material>\n`;
+
 					xml += "    </item>\n";
 				});
 			});
@@ -83,13 +105,14 @@ export async function GET(request) {
 			const googleFeed = products.flatMap((product) => {
 				const itemGroupId = product.id;
 				const productLink = `https://${SHOPIFY_HOST_NAME}/products/${product.handle}`;
+				const googleCategory = categoryMap[product.product_type] || "635";
 
 				return product.variants.map((variant) => {
 					const availability =
 						variant.inventory_quantity > 0 && product.status === "active" ? "inStock" : "outOfStock";
 
-					return {
-						offerId: variant.id.toString(), // Entspricht g:id
+					const item = {
+						offerId: variant.id.toString(),
 						title: product.title + (variant.title !== "Default Title" ? ` - ${variant.title}` : ""),
 						description: product.description || "Keine Beschreibung verfügbar",
 						link: `${productLink}?variant=${variant.id}`,
@@ -101,11 +124,23 @@ export async function GET(request) {
 						availability: availability,
 						condition: "new",
 						brand: product.vendor || "Unbekannt",
-						...(variant.barcode && { gtin: variant.barcode }),
-						...(variant.option1 && { size: variant.option1 }),
-						...(variant.option2 && { color: variant.option2 }),
-						itemGroupId: itemGroupId.toString(), // Entspricht g:item_group_id
+						googleProductCategory: googleCategory,
+						itemGroupId: itemGroupId.toString(),
 					};
+
+					// Kategorie-spezifische Attribute
+					if (variant.barcode) item.gtin = variant.barcode;
+					if (variant.option1) item.size = variant.option1; // Größe (Pflicht für Betten/Teppiche)
+					if (variant.option2) item.color = variant.option2; // Farbe
+					if (variant.option3 && product.product_type === "Teppiche") {
+						item.pattern = variant.option3; // Muster für Teppiche
+					}
+					if (product.product_type.includes("Lampen") && variant.wattage) {
+						item.wattage = variant.wattage; // Wattzahl für Lampen
+					}
+					if (variant.material) item.material = variant.material; // Material
+
+					return item;
 				});
 			});
 
@@ -134,7 +169,6 @@ export async function GET(request) {
 		});
 	}
 }
-
 
 function escapeXml(unsafe) {
 	if (!unsafe) return "";
