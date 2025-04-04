@@ -118,23 +118,3 @@ export async function POST(req) {
 		});
 	}
 }
-
-export async function GET(req) {
-	try {
-		const adminSession = {
-			shop: SHOPIFY_HOST_NAME,
-			accessToken: SHOPIFY_ADMIN_ACCESS_TOKEN,
-		};
-		const adminRESTClient = new shopifyServer.clients.Rest({ session: adminSession });
-		const productResponse = await adminRESTClient.get({
-			path: "products.json",
-			query: { fields: "id,title,variants" },
-		});
-		const products = productResponse.body.products;
-
-		return NextResponse.json(products);
-	} catch (error) {
-		console.error("Error in GET request:", error);
-		return NextResponse.json({ error: "Fehler bei der Verarbeitung" });
-	}
-}
