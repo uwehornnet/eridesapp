@@ -7,7 +7,7 @@ const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 // Funktion zum Abrufen aller Metafelder eines Namespace
 async function getAllMetafields(client) {
 	const query = `query {
-    metafieldDefinitions(first: 250, ownerType: PRODUCT, constraintStatus: UNCONSTRAINED_ONLY) {
+    metafieldDefinitions(first: 250, ownerType: PRODUCT) {
         edges {
             node {
                     id,

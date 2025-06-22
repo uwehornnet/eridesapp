@@ -46,7 +46,7 @@ export async function GET(request) {
 
 			products.forEach((product) => {
 				const itemGroupId = product.id;
-				const productLink = `https://${SHOPIFY_HOST_NAME}/products/${product.handle}`;
+				const productLink = `${SHOPIFY_HOST_NAME}/products/${product.handle}`;
 				const googleCategory = categoryMap[product.product_type] || "635"; // Fallback: Furniture
 
 				product.variants.forEach((variant) => {
@@ -104,7 +104,7 @@ export async function GET(request) {
 		if (type === "json") {
 			const googleFeed = products.flatMap((product) => {
 				const itemGroupId = product.id;
-				const productLink = `https://${SHOPIFY_HOST_NAME}/products/${product.handle}`;
+				const productLink = `${SHOPIFY_HOST_NAME}/products/${product.handle}`;
 				const googleCategory = categoryMap[product.product_type] || "635";
 
 				return product.variants.map((variant) => {
