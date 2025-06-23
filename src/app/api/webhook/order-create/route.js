@@ -38,7 +38,7 @@ export async function POST(request) {
 		const body = await request.json();
 
 		const clientIdAttr = body.note_attributes?.find((attr) => attr.name === "_ga");
-		const client_id = clientIdAttr?.value;
+		const client_id = clientIdAttr?.value || "555"; // Fallback auf '555', wenn kein _ga Wert vorhanden ist
 
 		if (!client_id) {
 			console.warn("Kein _ga client_id vorhanden, überspringe Tracking.");
