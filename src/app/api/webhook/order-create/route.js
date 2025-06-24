@@ -33,24 +33,19 @@ async function sendToGA4WithRetry(payload, maxRetries = 3, delayMs = 1000) {
 	return false; // alle Versuche fehlgeschlagen
 }
 
-export async function POST(request) {
+export async function POST(req) {
 	try {
-		const body = await request.json();
+		const rawBody = await req.text();
 
-		const clientIdAttr = body.note_attributes?.find((attr) => attr.name === "_ga");
-		const client_id = clientIdAttr?.value || "555"; // Fallback auf '555', wenn kein _ga Wert vorhanden ist
-
-		if (!client_id) {
-			console.warn("Kein _ga client_id vorhanden, überspringe Tracking.");
-			return NextResponse.json({ status: "no_client_id" }, { status: 200 });
-		}
+		// Danach JSON parsen
+		const body = JSON.parse(rawBody);
 
 		const value = parseFloat(body.total_price || 0);
 		const currency = body.currency || "EUR";
 		const order_id = body.id;
 
 		const payload = {
-			client_id: client_id,
+			client_id: "555",
 			events: [
 				{
 					name: "purchase",
@@ -68,13 +63,14 @@ export async function POST(request) {
 			],
 		};
 
-		console.log("GA4 Payload:", JSON.stringify(payload, null, 2));
 		const success = await sendToGA4WithRetry(payload);
 
 		if (!success) {
 			console.error("GA4 tracking failed after retries.");
 			return NextResponse.json({ error: "GA4 failed after retries" }, { status: 500 });
 		}
+
+		return NextResponse.json({ success: true }, { status: 200 });
 	} catch (error) {
 		console.error("Webhook Fehler:", error);
 		return new NextResponse(error.message, {

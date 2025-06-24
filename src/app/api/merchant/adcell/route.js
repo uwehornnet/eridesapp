@@ -122,8 +122,6 @@ export async function GET(request) {
 			return NextResponse.json({ error: "Missing Shopify credentials" }, { status: 500 });
 		}
 
-		const url = new URL(request.url);
-
 		const adminSession = {
 			shop: SHOPIFY_HOST_NAME,
 			accessToken: SHOPIFY_ADMIN_ACCESS_TOKEN,
