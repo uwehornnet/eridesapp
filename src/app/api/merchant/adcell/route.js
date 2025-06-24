@@ -43,6 +43,7 @@ const queryProducWithMetafields = async (session) => {
 									price
 									barcode
 									sku
+									availableForSale
 									image {
 										originalSrc
 										altText
@@ -91,7 +92,8 @@ const queryProducWithMetafields = async (session) => {
 			const mwst = 0.19; // 19 % MwSt
 			const netto = +(brutto / (1 + mwst)).toFixed(2);
 			const variantImage = variant.image?.originalSrc || images[0] || "";
-
+			const time_to_deliver = parseInt(metafields.lieferzeit);
+			const delivery_time = `${time_to_deliver - 1} - ${time_to_deliver + 1} Werktage`;
 			response.push({
 				title: product.title + (variant.title !== "Default Title" ? ` - ${variant.title}` : ""),
 				description: product.bodyHtml,
@@ -101,8 +103,9 @@ const queryProducWithMetafields = async (session) => {
 				currency: "EUR",
 				aan: variant.sku,
 				ean: variant.barcode,
-				delivery_time: metafields.lieferzeit,
+				delivery_time: delivery_time,
 				shipping_costs: metafields.versandkosten.amount,
+				stock: variant.availableForSale ? "Auf Lager" : "Nicht auf Lager",
 				category: product.productType,
 				preview_image: variantImage,
 				product_image: variantImage,
@@ -152,7 +155,8 @@ export async function GET(request) {
 				"Versandkosten Rechnung",
 				"Versandkosten PayPal",
 				"Versandkosten Sofortüberweisung",
-				"Lieferzeit/Verfügbarkeit",
+				"Verfügbarkeit",
+				"Lieferzeit",
 				"Grundpreis",
 				"Grundpreiseinheit",
 				"Inhalt",
@@ -176,7 +180,7 @@ export async function GET(request) {
 				product.shipping_costs || ""
 			}","${product.shipping_costs || ""}","${product.shipping_costs || ""}","${product.shipping_costs || ""}","${
 				product.shipping_costs || ""
-			}","${product.delivery_time || ""}","","",""`;
+			}","${product.stock || ""}","${product.delivery_time || ""}","","",""`;
 
 			// Füge Produktbilder hinzu
 			if (product.images && product.images.length > 0) {
