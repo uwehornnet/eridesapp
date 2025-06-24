@@ -15,6 +15,8 @@ const categoryMap = {
 	Teppiche: "696", // Home & Garden > Decor > Rugs
 };
 
+
+
 export async function GET(request) {
 	try {
 		if (!SHOPIFY_HOST_NAME || !SHOPIFY_ADMIN_ACCESS_TOKEN) {
@@ -28,6 +30,7 @@ export async function GET(request) {
 			shop: SHOPIFY_HOST_NAME,
 			accessToken: SHOPIFY_ADMIN_ACCESS_TOKEN,
 		};
+
 		const adminRESTClient = new shopifyServer.clients.Rest({ session: adminSession });
 
 		const productResponse = await adminRESTClient.get({
