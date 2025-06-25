@@ -4,8 +4,6 @@ const GA4_MEASUREMENT_ID = process.env.GA4_MEASUREMENT_ID;
 const GA4_API_SECRET = process.env.GA4_API_SECRET;
 
 async function sendToGA4WithRetry(payload) {
-	console.log(JSON.stringify(payload));
-
 	const url = `https://www.google-analytics.com/mp/collect?measurement_id=${GA4_MEASUREMENT_ID}&api_secret=${GA4_API_SECRET}`;
 	const res = await fetch(url, {
 		method: "POST",
@@ -39,18 +37,20 @@ export async function POST(req) {
 		// Danach JSON parsen
 		const body = JSON.parse(rawBody);
 
-		const value = parseFloat(body.total_price || 0);
-		const currency = body.currency || "EUR";
-		const order_id = body.id;
-
 		const tags = body.tags || [];
 		if (!tags.includes("ga4")) {
 			console.log("GA4 tag not found, skipping GA4 tracking.");
 			return NextResponse.json({ success: true }, { status: 200 });
 		}
 
+		const value = parseFloat(body.total_price || 0);
+		const currency = body.currency || "EUR";
+		const order_id = body.id;
+		const clientIdAttr = body.note_attributes?.find((attr) => attr.name === "ga_client_id");
+		const clientId = clientIdAttr ? clientIdAttr.value : "555";
+
 		const payload = {
-			client_id: "555",
+			client_id: `${clientId}`,
 			events: [
 				{
 					name: "purchase",

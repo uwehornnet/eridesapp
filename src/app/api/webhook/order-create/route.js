@@ -48,9 +48,11 @@ export async function POST(req) {
 		const value = parseFloat(body.total_price || 0);
 		const currency = body.currency || "EUR";
 		const order_id = body.id;
+		const clientIdAttr = body.note_attributes?.find((attr) => attr.name === "ga_client_id");
+		const clientId = clientIdAttr ? clientIdAttr.value : "555";
 
 		const payload = {
-			client_id: "555",
+			client_id: `${clientId}`,
 			events: [
 				{
 					name: "purchase",
