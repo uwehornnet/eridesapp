@@ -45,7 +45,7 @@ export async function POST(req) {
 		// Danach JSON parsen
 		const body = JSON.parse(rawBody);
 
-		const value = parseFloat(body.total_price || 0);
+		const value = parseFloat(body.subtotal_price || 0);
 		const currency = body.currency || "EUR";
 		const order_id = body.id;
 		const clientIdAttr = body.note_attributes?.find((attr) => attr.name === "ga_client_id");

@@ -43,7 +43,7 @@ export async function POST(req) {
 			return NextResponse.json({ success: true }, { status: 200 });
 		}
 
-		const value = parseFloat(body.total_price || 0);
+		const value = parseFloat(body.subtotal_price || 0);
 		const currency = body.currency || "EUR";
 		const order_id = body.id;
 		const clientIdAttr = body.note_attributes?.find((attr) => attr.name === "ga_client_id");
