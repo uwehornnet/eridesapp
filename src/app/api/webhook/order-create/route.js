@@ -3,39 +3,32 @@ import { NextResponse } from "next/server";
 const GA4_MEASUREMENT_ID = process.env.GA4_MEASUREMENT_ID;
 const GA4_API_SECRET = process.env.GA4_API_SECRET;
 
-async function sendToGA4WithRetry(payload, maxRetries = 3, delayMs = 1000) {
+
+async function sendToGA4WithRetry(payload) {
 	const url = `https://www.google-analytics.com/mp/collect?measurement_id=${GA4_MEASUREMENT_ID}&api_secret=${GA4_API_SECRET}`;
+	const res = await fetch(url, {
+		method: "POST",
+		body: JSON.stringify(payload),
+		headers: { "Content-Type": "application/json" },
+	});
 
-	for (let attempt = 1; attempt <= maxRetries; attempt++) {
-		try {
-			const res = await fetch(url, {
-				method: "POST",
-				body: JSON.stringify(payload),
-				headers: { "Content-Type": "application/json" },
-			});
-
-			if (res.ok) {
-				return {
-					success: true,
-					message: `GA4 tracking successful on attempt ${attempt}`,
-					status: res.status,
-					data: await res.json(), // Optional: response data if needed
-				};
-			} else {
-				const errText = await res.text();
-				console.warn(`GA4 Error (Attempt ${attempt}): ${res.status} - ${errText}`);
-			}
-		} catch (err) {
-			console.warn(`GA4 Network Error (Attempt ${attempt}):`, err.message);
-		}
-
-		// Verzögerung vor erneutem Versuch
-		if (attempt < maxRetries) {
-			await new Promise((resolve) => setTimeout(resolve, delayMs));
-		}
+	if (res.ok) {
+		return {
+			success: true,
+			message: `GA4 tracking successful`,
+			status: res.status,
+			data: null,
+		};
+	} else {
+		const errText = await res.text();
+		console.warn(`GA4 Error: ${res.status} - ${errText}`);
+		return {
+			success: false,
+			message: `GA4 Error: ${res.status} - ${errText}`,
+			status: res.status,
+			data: null,
+		};
 	}
-
-	return false; // alle Versuche fehlgeschlagen
 }
 
 export async function POST(req) {
@@ -73,7 +66,7 @@ export async function POST(req) {
 
 		if (!success) {
 			console.error("GA4 tracking failed after retries.");
-			return NextResponse.json({ error: "GA4 failed after retries" }, { status: 500 });
+			return NextResponse.json({ error: message }, { status: 500 });
 		}
 
 		console.log(message, status, data);
