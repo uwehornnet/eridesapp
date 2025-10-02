@@ -3,6 +3,16 @@ import { NextResponse } from "next/server";
 const GA4_MEASUREMENT_ID = process.env.GA4_MEASUREMENT_ID;
 const GA4_API_SECRET = process.env.GA4_API_SECRET;
 
+function extractTrackingAttributes(noteAttributes) {
+	const mapping = {};
+	if (!noteAttributes) return mapping;
+
+	noteAttributes.forEach((attr) => {
+		mapping[attr.name] = attr.value;
+	});
+
+	return mapping;
+}
 
 async function sendToGA4WithRetry(payload) {
 	const url = `https://www.google-analytics.com/mp/collect?measurement_id=${GA4_MEASUREMENT_ID}&api_secret=${GA4_API_SECRET}`;
@@ -43,9 +53,24 @@ export async function POST(req) {
 		const order_id = body.id;
 		const clientIdAttr = body.note_attributes?.find((attr) => attr.name === "ga_client_id");
 		const clientId = clientIdAttr ? clientIdAttr.value : "555";
+		const attributes = extractTrackingAttributes(body.note_attributes);
 
 		const payload = {
 			client_id: `${clientId}`,
+			user_properties: {
+				// Beispiel: UTM-Werte als user_properties mitsenden
+				utm_source: { value: attributes["erides_utm_source"] || "" },
+				utm_medium: { value: attributes["erides_utm_medium"] || "" },
+				utm_campaign: { value: attributes["erides_utm_campaign"] || "" },
+				utm_content: { value: attributes["erides_utm_content"] || "" },
+				utm_term: { value: attributes["erides_utm_term"] || "" },
+
+				gclid: { value: attributes["erides_gclid"] || "" },
+				msclkid: { value: attributes["erides_msclkid"] || "" },
+				fbclid: { value: attributes["erides_fbclid"] || "" },
+				ttclid: { value: attributes["erides_ttclid"] || "" },
+				adcref: { value: attributes["erides_adcref"] || "" },
+			},
 			events: [
 				{
 					name: "purchase",
@@ -53,8 +78,10 @@ export async function POST(req) {
 						transaction_id: order_id.toString(),
 						value: value,
 						currency: currency,
+						coupon: body.discount_applications?.map((d) => d.code).join(",") || undefined,
 						items: body.line_items.map((item) => ({
 							item_name: item.title,
+							item_id: item.product_id?.toString(),
 							price: parseFloat(item.price),
 							quantity: item.quantity,
 						})),
