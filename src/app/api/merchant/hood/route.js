@@ -389,9 +389,8 @@ export async function GET(request) {
 		};
 
 		// Query-Parameter prüfen: useBulk=true für Bulk Operations
-		// const { searchParams } = new URL(request.url);
-		// const useBulk = searchParams.get("useBulk") === "true";
-		const useBulk = true;
+		const { searchParams } = new URL(request.url);
+		const useBulk = searchParams.get("useBulk") === "true";
 
 		let allProducts;
 
