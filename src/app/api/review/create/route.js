@@ -121,7 +121,6 @@ export async function POST(request) {
 			metafield, // bestehendes Metafeld oder null
 		} = await checkMetafieldDefinition(client);
 
-		console.log({ exists, shopId, metafield });
 		// 2. Wenn nicht vorhanden, erstelle Definition
 		if (!exists) {
 			const createRes = await createMetafieldDefinition(client);
@@ -152,6 +151,7 @@ export async function POST(request) {
 			rating,
 			comment,
 			date: new Date().toISOString().split("T")[0],
+			published: false,
 		};
 
 		const updated = [...current, newReview];
@@ -187,4 +187,12 @@ export async function POST(request) {
 		console.error("POST error:", err);
 		return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
 	}
+}
+
+export async function OPTIONS() {
+	const response = new NextResponse(null, { status: 204 });
+	response.headers.set("Access-Control-Allow-Origin", "*");
+	response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+	response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+	return response;
 }
