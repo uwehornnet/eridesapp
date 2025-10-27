@@ -182,7 +182,17 @@ export async function POST(request) {
 			return NextResponse.json({ error: "Failed to save review", saveErrors }, { status: 500 });
 		}
 
-		return NextResponse.json({ success: true });
+		return NextResponse.json(
+			{ success: true },
+			{
+				status: 200,
+				headers: {
+					"Access-Control-Allow-Origin": "*",
+					"Access-Control-Allow-Methods": "POST, OPTIONS",
+					"Access-Control-Allow-Headers": "Content-Type, Authorization",
+				},
+			}
+		);
 	} catch (err) {
 		console.error("POST error:", err);
 		return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
