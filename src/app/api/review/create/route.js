@@ -13,7 +13,7 @@ export async function POST(request) {
 
 		const body = await request.json();
 		const { product_id, name, rating, comment } = body;
-
+		
 		if (!product_id || !name || !rating || !comment) {
 			return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 		}
@@ -30,12 +30,12 @@ export async function POST(request) {
 		const today = new Date().toISOString().split("T")[0];
 
 		// Generiere eindeutigen Handle
-		const handle = `review-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+		const handle = `kundenbewertung-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 		const createReviewMutation = `
 			mutation CreateReview($handle: String!, $fields: [MetaobjectFieldInput!]!) {
 				metaobjectCreate(metaobject: {
-					type: "review",
+					type: "kundenbewertung",
 					handle: $handle,
 					fields: $fields
 				}) {
@@ -106,6 +106,7 @@ export async function POST(request) {
 				reviewIds = JSON.parse(currentMetafield.value);
 			} catch (e) {
 				console.warn("Error parsing existing reviews:", e);
+				reviewIds = [];
 			}
 		}
 
@@ -114,8 +115,14 @@ export async function POST(request) {
 
 		// 4. Aktualisiere Shop-Metafeld mit neuer Review-Liste
 		const updateMetafieldMutation = `
-			mutation UpdateShopMetafield($metafields: [MetafieldsSetInput!]!) {
-				metafieldsSet(metafields: $metafields) {
+			mutation UpdateShopMetafield($ownerId: ID!, $value: String!) {
+				metafieldsSet(metafields: [{
+					namespace: "custom",
+					key: "bewertungen",
+					type: "list.metaobject_reference",
+					value: $value,
+					ownerId: $ownerId
+				}]) {
 					metafields {
 						id
 						value
@@ -130,15 +137,8 @@ export async function POST(request) {
 
 		const updateResponse = await client.request(updateMetafieldMutation, {
 			variables: {
-				metafields: [
-					{
-						namespace: "custom",
-						key: "bewertungen",
-						type: "list.metaobject_reference",
-						value: JSON.stringify(reviewIds),
-						ownerId: shopId,
-					},
-				],
+				ownerId: shopId,
+				value: JSON.stringify(reviewIds),
 			},
 			retries: 2,
 		});
