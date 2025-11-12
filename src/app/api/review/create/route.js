@@ -13,7 +13,7 @@ export async function POST(request) {
 
 		const body = await request.json();
 		const { product_id, name, rating, comment } = body;
-		
+
 		if (!product_id || !name || !rating || !comment) {
 			return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 		}
@@ -51,10 +51,33 @@ export async function POST(request) {
 			}
 		`;
 
+		// Rating im korrekten Format (scale_min, scale_max, value)
+		const ratingValue = JSON.stringify({
+			scale_min: "1.0",
+			scale_max: "5.0",
+			value: parseFloat(rating).toFixed(1),
+		});
+
+		// Kommentar als JSON-String
+		const commentValue = JSON.stringify({
+			type: "root",
+			children: [
+				{
+					type: "paragraph",
+					children: [
+						{
+							type: "text",
+							value: comment,
+						},
+					],
+				},
+			],
+		});
+
 		const fields = [
 			{ key: "name", value: name },
-			{ key: "rating", value: rating.toString() },
-			{ key: "kommentar", value: comment },
+			{ key: "rating", value: ratingValue },
+			{ key: "kommentar", value: commentValue },
 			{ key: "produkt", value: productGid },
 			{ key: "published", value: "false" },
 			{ key: "datum", value: today },
