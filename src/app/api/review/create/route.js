@@ -5,18 +5,130 @@ import { NextResponse } from "next/server";
 const SHOPIFY_HOST_NAME = process.env.SHOPIFY_HOST_NAME;
 const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
-const checkMetafieldDefinition = async (client) => {
+// Prüfe ob Metaobjekt-Definition existiert
+const checkMetaobjectDefinition = async (client) => {
 	try {
 		const checkQuery = `
-			query CheckMetafield($first: Int!) {
-				shop {
-					id
-					metafield(namespace: "reviews", key: "all") {
-						id
-						value
+			query CheckMetaobjectDefinition {
+				metaobjectDefinitions(first: 10, type: "review") {
+					edges {
+						node {
+							id
+							type
+							name
+						}
 					}
 				}
-				metafieldDefinitions(first: $first, namespace: "reviews", key: "all", ownerType: SHOP) {
+			}
+		`;
+
+		const response = await client.request(checkQuery, {
+			retries: 2,
+		});
+
+		const metaobjectExists = response.data.metaobjectDefinitions.edges.length > 0;
+		const definition = metaobjectExists ? response.data.metaobjectDefinitions.edges[0].node : null;
+
+		return {
+			exists: metaobjectExists,
+			definition,
+		};
+	} catch (error) {
+		console.error("Error checking metaobject definition:", error);
+		return {
+			exists: false,
+			definition: null,
+		};
+	}
+};
+
+// Erstelle Metaobjekt-Definition falls nicht vorhanden
+const createMetaobjectDefinition = async (client) => {
+	try {
+		const createMutation = `
+			mutation CreateMetaobjectDefinition {
+				metaobjectDefinitionCreate(definition: {
+					name: "Review",
+					type: "review",
+					fieldDefinitions: [
+						{
+							key: "name",
+							name: "Name",
+							type: "single_line_text_field"
+						},
+						{
+							key: "rating",
+							name: "Bewertung",
+							type: "number_integer",
+							validations: [{name: "min", value: "1"}, {name: "max", value: "5"}]
+						},
+						{
+							key: "kommentar",
+							name: "Kommentar",
+							type: "multi_line_text_field"
+						},
+						{
+							key: "produkt",
+							name: "Produkt",
+							type: "product_reference"
+						},
+						{
+							key: "published",
+							name: "Veröffentlicht",
+							type: "boolean"
+						},
+						{
+							key: "verifizierter_kaeufer",
+							name: "Verifizierter Käufer",
+							type: "boolean"
+						},
+						{
+							key: "datum",
+							name: "Datum",
+							type: "date"
+						}
+					]
+				}) {
+					metaobjectDefinition {
+						id
+						type
+					}
+					userErrors {
+						field
+						message
+					}
+				}
+			}
+		`;
+
+		const response = await client.request(createMutation, {
+			retries: 2,
+		});
+
+		const result = response.data.metaobjectDefinitionCreate;
+		const success = result?.metaobjectDefinition?.id && result.userErrors.length === 0;
+
+		return {
+			success,
+			definition: result?.metaobjectDefinition || null,
+			errors: result.userErrors || [],
+		};
+	} catch (error) {
+		console.error("Error creating metaobject definition:", error);
+		return {
+			success: false,
+			definition: null,
+			errors: [{ message: error.message }],
+		};
+	}
+};
+
+// Prüfe ob Shop-Metafeld für Review-Liste existiert
+const checkShopMetafieldDefinition = async (client) => {
+	try {
+		const checkQuery = `
+			query CheckShopMetafield {
+				metafieldDefinitions(first: 10, namespace: "custom", key: "bewertungen", ownerType: SHOP) {
 					edges {
 						node {
 							id
@@ -28,38 +140,28 @@ const checkMetafieldDefinition = async (client) => {
 		`;
 
 		const response = await client.request(checkQuery, {
-			variables: { first: 1 },
 			retries: 2,
 		});
 
-		const metafieldExists = response.data.metafieldDefinitions.edges.length > 0;
-		const shopId = response.data.shop.id;
-		const existingMetafield = response.data.shop.metafield;
+		const exists = response.data.metafieldDefinitions.edges.length > 0;
 
-		return {
-			exists: metafieldExists,
-			shopId,
-			metafield: existingMetafield,
-		};
+		return { exists };
 	} catch (error) {
-		console.error("Error checking metafield definition:", error);
-		return {
-			exists: false,
-			shopId: null,
-			metafield: null,
-		};
+		console.error("Error checking shop metafield definition:", error);
+		return { exists: false };
 	}
 };
 
-const createMetafieldDefinition = async (client) => {
+// Erstelle Shop-Metafeld-Definition für Review-Liste
+const createShopMetafieldDefinition = async (client) => {
 	try {
 		const createMutation = `
-			mutation CreateMetafieldDefinition {
+			mutation CreateShopMetafieldDefinition {
 				metafieldDefinitionCreate(definition: {
-					name: "Produktbewertungen",
-					namespace: "reviews",
-					key: "all",
-					type: "json",
+					name: "Bewertungen",
+					namespace: "custom",
+					key: "bewertungen",
+					type: "list.metaobject_reference",
 					ownerType: SHOP
 				}) {
 					createdDefinition {
@@ -74,7 +176,7 @@ const createMetafieldDefinition = async (client) => {
 		`;
 
 		const response = await client.request(createMutation, {
-			retries: 2, // optional
+			retries: 2,
 		});
 
 		const result = response.data.metafieldDefinitionCreate;
@@ -82,14 +184,12 @@ const createMetafieldDefinition = async (client) => {
 
 		return {
 			success,
-			createdId: result?.createdDefinition?.id || null,
 			errors: result.userErrors || [],
 		};
 	} catch (error) {
-		console.error("Error creating metafield definition:", error);
+		console.error("Error creating shop metafield definition:", error);
 		return {
 			success: false,
-			createdId: null,
 			errors: [{ message: error.message }],
 		};
 	}
@@ -103,6 +203,7 @@ export async function POST(request) {
 
 		const body = await request.json();
 		const { product_id, name, rating, comment } = body;
+		
 		if (!product_id || !name || !rating || !comment) {
 			return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 		}
@@ -114,76 +215,166 @@ export async function POST(request) {
 
 		const client = new shopifyServer.clients.Graphql({ session: adminSession });
 
-		// 1. Prüfe, ob Metafield-Definition existiert
-		const {
-			exists, // true/false → existiert Definition?
-			shopId, // z. B. "gid://shopify/Shop/123..."
-			metafield, // bestehendes Metafeld oder null
-		} = await checkMetafieldDefinition(client);
+		// 1. Prüfe und erstelle Metaobjekt-Definition falls nötig
+		const { exists: metaobjectExists } = await checkMetaobjectDefinition(client);
 
-		// 2. Wenn nicht vorhanden, erstelle Definition
-		if (!exists) {
-			const createRes = await createMetafieldDefinition(client);
-			const errors = createRes.body.data.metafieldDefinitionCreate.userErrors;
-			if (errors.length > 0) {
-				return NextResponse.json({ error: "Failed to create metafield definition", errors }, { status: 500 });
+		if (!metaobjectExists) {
+			const createResult = await createMetaobjectDefinition(client);
+			if (!createResult.success) {
+				return NextResponse.json(
+					{ error: "Failed to create metaobject definition", errors: createResult.errors },
+					{ status: 500 }
+				);
 			}
 		}
 
-		// 4. Neue Bewertung anhängen
-		// Hole bisherigen Wert aus bestehendem Metafeld
-		const existingValue = metafield?.value;
-		let current = [];
+		// 2. Prüfe und erstelle Shop-Metafeld-Definition falls nötig
+		const { exists: shopMetafieldExists } = await checkShopMetafieldDefinition(client);
 
-		if (existingValue) {
-			try {
-				current = JSON.parse(existingValue);
-			} catch (e) {
-				console.warn("Fehler beim Parsen des bestehenden Metafeld-Werts:", e);
-				current = [];
+		if (!shopMetafieldExists) {
+			const createResult = await createShopMetafieldDefinition(client);
+			if (!createResult.success) {
+				return NextResponse.json(
+					{ error: "Failed to create shop metafield definition", errors: createResult.errors },
+					{ status: 500 }
+				);
 			}
 		}
 
-		// 4. Neue Bewertung anhängen
-		const newReview = {
-			product_id,
-			name,
-			rating,
-			comment,
-			date: new Date().toISOString().split("T")[0],
-			published: false,
-		};
+		// 3. Erstelle neues Review-Metaobjekt
+		const productGid = product_id.startsWith("gid://") ? product_id : `gid://shopify/Product/${product_id}`;
+		const today = new Date().toISOString().split("T")[0];
 
-		const updated = [...current, newReview];
-
-		// JSON-String vorbereiten (mit Escaping)
-		const json = JSON.stringify(updated).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-
-		// 5. Speichern
-		const metafieldTarget = `ownerId: "${shopId}"`;
-
-		const saveMutation = `
-			mutation {
-				metafieldsSet(metafields: [{
-					namespace: "reviews",
-					key: "all",
-					type: "json",
-					value: "${json}",
-					${metafieldTarget}
-				}]) {
-					metafields { id }
-					userErrors { field message }
+		const createReviewMutation = `
+			mutation CreateReview($handle: String!, $fields: [MetaobjectFieldInput!]!) {
+				metaobjectCreate(metaobject: {
+					type: "review",
+					handle: $handle,
+					fields: $fields
+				}) {
+					metaobject {
+						id
+						handle
+					}
+					userErrors {
+						field
+						message
+					}
 				}
 			}
 		`;
-		const saveRes = await client.query({ data: saveMutation });
-		const saveErrors = saveRes.body.data.metafieldsSet.userErrors;
-		if (saveErrors.length > 0) {
-			return NextResponse.json({ error: "Failed to save review", saveErrors }, { status: 500 });
+
+		// Generiere eindeutigen Handle
+		const handle = `review-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+		const fields = [
+			{ key: "name", value: name },
+			{ key: "rating", value: rating.toString() },
+			{ key: "kommentar", value: comment },
+			{ key: "produkt", value: productGid },
+			{ key: "published", value: "false" },
+			{ key: "verifizierter_kaeufer", value: "false" },
+			{ key: "datum", value: today },
+		];
+
+		const createResponse = await client.request(createReviewMutation, {
+			variables: {
+				handle,
+				fields,
+			},
+			retries: 2,
+		});
+
+		const createResult = createResponse.data.metaobjectCreate;
+
+		if (createResult.userErrors.length > 0) {
+			return NextResponse.json(
+				{ error: "Failed to create review", errors: createResult.userErrors },
+				{ status: 500 }
+			);
+		}
+
+		const reviewId = createResult.metaobject.id;
+
+		// 4. Hole aktuelle Review-Liste vom Shop
+		const getShopQuery = `
+			query GetShopReviews {
+				shop {
+					id
+					metafield(namespace: "custom", key: "bewertungen") {
+						id
+						value
+					}
+				}
+			}
+		`;
+
+		const shopResponse = await client.request(getShopQuery, {
+			retries: 2,
+		});
+
+		const shopId = shopResponse.data.shop.id;
+		const currentMetafield = shopResponse.data.shop.metafield;
+
+		// Parse existierende Review-IDs
+		let reviewIds = [];
+		if (currentMetafield?.value) {
+			try {
+				reviewIds = JSON.parse(currentMetafield.value);
+			} catch (e) {
+				console.warn("Error parsing existing reviews:", e);
+			}
+		}
+
+		// 5. Füge neue Review-ID hinzu
+		reviewIds.push(reviewId);
+
+		// 6. Aktualisiere Shop-Metafeld mit neuer Review-Liste
+		const updateMetafieldMutation = `
+			mutation UpdateShopMetafield($metafields: [MetafieldsSetInput!]!) {
+				metafieldsSet(metafields: $metafields) {
+					metafields {
+						id
+						value
+					}
+					userErrors {
+						field
+						message
+					}
+				}
+			}
+		`;
+
+		const updateResponse = await client.request(updateMetafieldMutation, {
+			variables: {
+				metafields: [
+					{
+						namespace: "custom",
+						key: "bewertungen",
+						type: "list.metaobject_reference",
+						value: JSON.stringify(reviewIds),
+						ownerId: shopId,
+					},
+				],
+			},
+			retries: 2,
+		});
+
+		const updateResult = updateResponse.data.metafieldsSet;
+
+		if (updateResult.userErrors.length > 0) {
+			return NextResponse.json(
+				{ error: "Failed to update shop reviews list", errors: updateResult.userErrors },
+				{ status: 500 }
+			);
 		}
 
 		return NextResponse.json(
-			{ success: true },
+			{
+				success: true,
+				reviewId,
+				message: "Review erfolgreich erstellt und wartet auf Freigabe",
+			},
 			{
 				status: 200,
 				headers: {
