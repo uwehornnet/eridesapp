@@ -67,14 +67,33 @@ export async function POST(req) {
 
 		const createdVariant = createVariantResponse.body.variant;
 
-		return NextResponse.json({
-			ok: true,
-			variantId: createdVariant.id,
-			price: price,
-			properties,
-		});
+		return NextResponse.json(
+			{
+				ok: true,
+				variantId: createdVariant.id,
+				price: price,
+				properties,
+			},
+			{
+				status: 200,
+				headers: {
+					"Access-Control-Allow-Origin": "*",
+					"Access-Control-Allow-Methods": "POST, OPTIONS",
+					"Access-Control-Allow-Headers": "Content-Type, Authorization",
+				},
+			}
+		);
 	} catch (error) {
 		console.error("Error in variant creation route:", error);
 		return NextResponse.json({ error: error.message || "Unknown server error" }, { status: 500 });
 	}
+}
+
+
+export async function OPTIONS() {
+	const response = new NextResponse(null, { status: 204 });
+	response.headers.set("Access-Control-Allow-Origin", "*");
+	response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+	response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+	return response;
 }
