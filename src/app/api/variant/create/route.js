@@ -4,8 +4,6 @@ import shopifyServer from "@/lib/shopify.server.js";
 const SHOPIFY_HOST_NAME = process.env.SHOPIFY_HOST_NAME;
 const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 
-// Hier die Produkt-ID deines Hidden-Service-Produkts eintragen!
-const SERVICE_PRODUCT_ID = "xxxxxxxxxxxx";
 
 export async function POST(req) {
 	try {
@@ -21,7 +19,7 @@ export async function POST(req) {
 			return NextResponse.json({ error: "Missing items in payload" }, { status: 400 });
 		}
 
-		const { quantity, properties, price } = item;
+		const { properties, price, id } = item;
 
 		// dynamischer Preis → convert to shopify price format
 		const formattedPrice = (price / 100).toFixed(2);
@@ -40,7 +38,7 @@ export async function POST(req) {
 
 		// Variante erzeugen
 		const createVariantResponse = await adminRESTClient.post({
-			path: `products/${SERVICE_PRODUCT_ID}/variants.json`,
+			path: `products/${id}/variants.json`,
 			data: {
 				variant: {
 					option1: variantTitle,
