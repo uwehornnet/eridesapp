@@ -44,6 +44,13 @@ export async function POST(req) {
 					option1: variantTitle,
 					price: formattedPrice,
 					sku: "srv_" + variantTitle,
+
+					// 🔧 WICHTIG:
+					inventory_management: null,
+					inventory_policy: "continue", // erlaubt Kauf ohne Bestand
+					fulfillment_service: "manual",
+					requires_shipping: false,
+
 					metafields: [
 						{
 							namespace: "custom",
@@ -62,6 +69,7 @@ export async function POST(req) {
 			},
 			type: "application/json",
 		});
+
 
 		const createdVariant = createVariantResponse.body.variant;
 
