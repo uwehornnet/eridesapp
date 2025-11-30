@@ -304,14 +304,27 @@ export async function GET(request) {
 		});
 	} catch (error) {
 		console.error("Error looking up discount:", error);
-		return NextResponse.json({ error: "Failed to lookup discount", details: error.message }, { status: 500 });
+		return NextResponse.json(
+			{ error: "Failed to lookup discount", details: error.message },
+			{
+				status: 500,
+				headers: {
+					"Access-Control-Allow-Origin": "*",
+					"Access-Control-Allow-Methods": "GET, OPTIONS",
+					"Access-Control-Allow-Headers": "Content-Type, Authorization",
+				},
+			}
+		);
 	}
 }
 
 export async function OPTIONS() {
-	const response = new NextResponse(null, { status: 204 });
-	response.headers.set("Access-Control-Allow-Origin", "*");
-	response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-	response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-	return response;
+	return new NextResponse(null, {
+		status: 200,
+		headers: {
+			"Access-Control-Allow-Origin": "*",
+			"Access-Control-Allow-Methods": "GET, OPTIONS",
+			"Access-Control-Allow-Headers": "Content-Type",
+		},
+	});
 }
