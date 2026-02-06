@@ -14,7 +14,7 @@ export async function GET() {
 		const query = `
 			query {
 				shop {
-					metafield(namespace: "reviews", key: "all") {
+					metafield(namespace: "custom.bewertungen", key: "all") {
 						value
 					}
 				}
