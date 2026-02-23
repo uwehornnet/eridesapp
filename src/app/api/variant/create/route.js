@@ -51,21 +51,24 @@ export async function POST(req) {
         `;
 
 		const variantTitle = "dynamic_" + Date.now() + "_" + Math.random().toString(36).slice(2);
-		const createResponse = await graphqlClient.request(createMutation, {
-			variables: {
-				productId: `gid://shopify/Product/${id}`,
-				variants: [
-					{
-						optionValues: [{ optionName: "Title", name: variantTitle }],
-						price: formattedPrice,
-						inventoryPolicy: "CONTINUE",
-						inventoryItem: {
-							tracked: false,
-							sku: "srv_" + variantTitle,
-							requiresShipping: false,
+		const createResponse = await graphqlClient.request({
+			data: {
+				query: createMutation,
+				variables: {
+					productId: `gid://shopify/Product/${id}`,
+					variants: [
+						{
+							optionValues: [{ optionName: "Title", name: variantTitle }],
+							price: formattedPrice,
+							inventoryPolicy: "CONTINUE",
+							inventoryItem: {
+								tracked: false,
+								sku: "srv_" + variantTitle,
+								requiresShipping: false,
+							},
 						},
-					},
-				],
+					],
+				},
 			},
 		});
 
@@ -106,18 +109,18 @@ export async function POST(req) {
 
 		// Bestand setzen
 		const setQuantityMutation = `
-			mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
-				inventorySetQuantities(input: $input) {
-					inventoryAdjustmentGroup {
-						id
-					}
-					userErrors {
-						field
-						message
-					}
+		mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
+			inventorySetQuantities(input: $input) {
+				inventoryAdjustmentGroup {
+					id
+				}
+				userErrors {
+					field
+					message
 				}
 			}
-		`;
+		}
+	`;
 
 		await graphqlClient.request(setQuantityMutation, {
 			variables: {
