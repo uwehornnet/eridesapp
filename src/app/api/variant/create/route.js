@@ -73,6 +73,20 @@ export async function POST(req) {
 
 		const createdVariant = createVariantResponse.body.variant;
 
+		await adminRESTClient.put({
+			path: `variants/${createdVariant.id}.json`,
+			data: {
+				variant: {
+					id: createdVariant.id,
+					inventory_management: null,
+					inventory_policy: "continue",
+				},
+			},
+			type: "application/json",
+		});
+		console.log("inventory_management:", createdVariant.inventory_management);
+		console.log("inventory_policy:", createdVariant.inventory_policy);
+
 		return NextResponse.json(
 			{
 				ok: true,
