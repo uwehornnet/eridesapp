@@ -60,7 +60,7 @@ export async function POST(req) {
 						},
 						{
 							namespace: "custom",
-							key: "properties_json",
+							key: "json_properties",
 							value: JSON.stringify(properties || {}),
 							type: "single_line_text_field",
 						},
