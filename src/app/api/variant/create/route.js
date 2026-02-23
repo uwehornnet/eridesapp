@@ -73,7 +73,7 @@ export async function POST(req) {
 
 		const createdVariant = createVariantResponse.body.variant;
 
-		await adminRESTClient.put({
+		const putResponse = await adminRESTClient.put({
 			path: `variants/${createdVariant.id}.json`,
 			data: {
 				variant: {
@@ -84,6 +84,9 @@ export async function POST(req) {
 			},
 			type: "application/json",
 		});
+
+		console.log("PUT variant result:", JSON.stringify(putResponse.body.variant?.inventory_management));
+		console.log("PUT variant policy:", JSON.stringify(putResponse.body.variant?.inventory_policy));
 
 		const locationId = 104671773052;
 		await adminRESTClient.post({
