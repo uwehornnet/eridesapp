@@ -84,8 +84,16 @@ export async function POST(req) {
 			},
 			type: "application/json",
 		});
-		console.log("inventory_management:", createdVariant.inventory_management);
-		console.log("inventory_policy:", createdVariant.inventory_policy);
+
+		const locationId = 104671773052;
+		await adminRESTClient.post({
+			path: "inventory_levels/connect.json",
+			data: {
+				location_id: locationId,
+				inventory_item_id: createdVariant.inventory_item_id,
+			},
+			type: "application/json",
+		});
 
 		return NextResponse.json(
 			{
