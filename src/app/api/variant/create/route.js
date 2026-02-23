@@ -51,7 +51,7 @@ export async function POST(req) {
         `;
 
 		const variantTitle = "dynamic_" + Date.now() + "_" + Math.random().toString(36).slice(2);
-		const createResponse = await graphqlClient.request({
+		const createResponse = await graphqlClient.query({
 			data: {
 				query: createMutation,
 				variables: {
@@ -95,15 +95,18 @@ export async function POST(req) {
     }
 `;
 
-		await graphqlClient.request(inventoryMutation, {
-			variables: {
-				inventoryItemId: inventoryItemId,
-				inventoryItemUpdates: [
-					{
-						locationId: `gid://shopify/Location/104671773052`,
-						activate: true,
-					},
-				],
+		await graphqlClient.query({
+			data: {
+				query: inventoryMutation,
+				variables: {
+					inventoryItemId: inventoryItemId,
+					inventoryItemUpdates: [
+						{
+							locationId: `gid://shopify/Location/104671773052`,
+							activate: true,
+						},
+					],
+				},
 			},
 		});
 
@@ -122,18 +125,21 @@ export async function POST(req) {
 		}
 	`;
 
-		await graphqlClient.request(setQuantityMutation, {
-			variables: {
-				input: {
-					name: "available",
-					reason: "correction",
-					quantities: [
-						{
-							inventoryItemId: inventoryItemId,
-							locationId: `gid://shopify/Location/104671773052`,
-							quantity: 999,
-						},
-					],
+		await graphqlClient.query({
+			data: {
+				query: setQuantityMutation,
+				variables: {
+					input: {
+						name: "available",
+						reason: "correction",
+						quantities: [
+							{
+								inventoryItemId: inventoryItemId,
+								locationId: `gid://shopify/Location/104671773052`,
+								quantity: 999,
+							},
+						],
+					},
 				},
 			},
 		});
