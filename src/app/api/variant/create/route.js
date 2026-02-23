@@ -46,7 +46,7 @@ export async function POST(req) {
 					sku: "srv_" + variantTitle,
 
 					// 🔧 WICHTIG:
-					inventory_management: null,
+					inventory_management: "shopify",
 					inventory_policy: "continue", // erlaubt Kauf ohne Bestand
 					fulfillment_service: "manual",
 					requires_shipping: false,
@@ -72,32 +72,7 @@ export async function POST(req) {
 
 
 		const createdVariant = createVariantResponse.body.variant;
-
-		const putResponse = await adminRESTClient.put({
-			path: `variants/${createdVariant.id}.json`,
-			data: {
-				variant: {
-					id: createdVariant.id,
-					inventory_management: null,
-					inventory_policy: "continue",
-				},
-			},
-			type: "application/json",
-		});
-
-		console.log("PUT variant result:", JSON.stringify(putResponse.body.variant?.inventory_management));
-		console.log("PUT variant policy:", JSON.stringify(putResponse.body.variant?.inventory_policy));
-
 		const locationId = 104671773052;
-		const location_level_request = await adminRESTClient.post({
-			path: "inventory_levels/connect.json",
-			data: {
-				location_id: locationId,
-				inventory_item_id: createdVariant.inventory_item_id,
-			},
-			type: "application/json",
-		});
-		console.log("Connect inventory level response:", JSON.stringify(location_level_request.body));
 
 		const set_inventory_response = await adminRESTClient.post({
 			path: "inventory_levels/set.json",
