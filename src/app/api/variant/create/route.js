@@ -51,21 +51,84 @@ export async function POST(req) {
         `;
 
 		const variantTitle = "dynamic_" + Date.now() + "_" + Math.random().toString(36).slice(2);
-		const createResponse = await graphqlClient.query({
-			data: {
-				query: createMutation,
-				variables: {
-					productId: `gid://shopify/Product/${id}`,
-					variants: [
+		const createResponse = await graphqlClient.request(createMutation, {
+			variables: {
+				productId: `gid://shopify/Product/${id}`,
+				variants: [
+					{
+						optionValues: [{ optionName: "Title", name: variantTitle }],
+						price: formattedPrice,
+						inventoryPolicy: "CONTINUE",
+						inventoryItem: {
+							tracked: false,
+							sku: "srv_" + variantTitle,
+							requiresShipping: false,
+						},
+					},
+				],
+			},
+		});
+
+		const createdVariant = createResponse.body.data.productVariantsBulkCreate.productVariants[0];
+		const inventoryItemId = createdVariant.inventoryItem.id; // bereits im Query enthalten
+
+		// Inventory Level aktivieren
+		const inventoryMutation = `
+    mutation inventoryBulkToggleActivation($inventoryItemId: ID!, $inventoryItemUpdates: [InventoryBulkToggleActivationInput!]!) {
+        inventoryBulkToggleActivation(inventoryItemId: $inventoryItemId, inventoryItemUpdates: $inventoryItemUpdates) {
+            inventoryItem {
+                id
+            }
+            inventoryLevels {
+                quantities(names: ["available"]) {
+                    quantity
+                }
+            }
+            userErrors {
+                field
+                message
+            }
+        }
+    }
+`;
+
+		await graphqlClient.request(inventoryMutation, {
+			variables: {
+				inventoryItemId: inventoryItemId,
+				inventoryItemUpdates: [
+					{
+						locationId: `gid://shopify/Location/104671773052`,
+						activate: true,
+					},
+				],
+			},
+		});
+
+		// Bestand setzen
+		const setQuantityMutation = `
+			mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
+				inventorySetQuantities(input: $input) {
+					inventoryAdjustmentGroup {
+						id
+					}
+					userErrors {
+						field
+						message
+					}
+				}
+			}
+		`;
+
+		await graphqlClient.request(setQuantityMutation, {
+			variables: {
+				input: {
+					name: "available",
+					reason: "correction",
+					quantities: [
 						{
-							optionValues: [{ optionName: "Title", name: variantTitle }],
-							price: formattedPrice,
-							inventoryPolicy: "CONTINUE",
-							inventoryItem: {
-								tracked: false,
-								sku: "srv_" + variantTitle,
-								requiresShipping: false,
-							},
+							inventoryItemId: inventoryItemId,
+							locationId: `gid://shopify/Location/104671773052`,
+							quantity: 999,
 						},
 					],
 				},
@@ -78,7 +141,7 @@ export async function POST(req) {
 			return NextResponse.json({ error: userErrors[0].message }, { status: 422 });
 		}
 
-		const createdVariant = createResponse.body.data.productVariantsBulkCreate.productVariants[0];
+		//const createdVariant = createResponse.body.data.productVariantsBulkCreate.productVariants[0];
 		const variantLegacyId = createdVariant.legacyResourceId; // numerische ID für cart/add.js
 
 		// const adminRESTClient = new shopifyServer.clients.Rest({
