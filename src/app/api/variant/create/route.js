@@ -89,7 +89,7 @@ export async function POST(req) {
 		console.log("PUT variant policy:", JSON.stringify(putResponse.body.variant?.inventory_policy));
 
 		const locationId = 104671773052;
-		await adminRESTClient.post({
+		const location_level_request = await adminRESTClient.post({
 			path: "inventory_levels/connect.json",
 			data: {
 				location_id: locationId,
@@ -97,6 +97,18 @@ export async function POST(req) {
 			},
 			type: "application/json",
 		});
+		console.log("Connect inventory level response:", JSON.stringify(location_level_request.body));
+
+		const set_inventory_response = await adminRESTClient.post({
+			path: "inventory_levels/set.json",
+			data: {
+				location_id: locationId,
+				inventory_item_id: createdVariant.inventory_item_id,
+				available: 999,
+			},
+			type: "application/json",
+		});
+		console.log("Set inventory level response:", JSON.stringify(set_inventory_response.body));
 
 		return NextResponse.json(
 			{
