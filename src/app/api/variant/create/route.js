@@ -50,6 +50,7 @@ export async function POST(req) {
             }
         `;
 
+		const variantTitle = "dynamic_" + Date.now() + "_" + Math.random().toString(36).slice(2);
 		const createResponse = await graphqlClient.query({
 			data: {
 				query: createMutation,
