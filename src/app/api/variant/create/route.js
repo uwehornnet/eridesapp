@@ -60,11 +60,11 @@ export async function POST(req) {
 						{
 							optionValues: [{ optionName: "Title", name: variantTitle }],
 							price: formattedPrice,
-							sku: "srv_" + variantTitle,
-							requiresShipping: false,
 							inventoryPolicy: "CONTINUE",
 							inventoryItem: {
 								tracked: false,
+								sku: "srv_" + variantTitle,
+								requiresShipping: false,
 							},
 						},
 					],
