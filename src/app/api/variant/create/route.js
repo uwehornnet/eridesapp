@@ -13,6 +13,7 @@ export async function POST(req) {
 
 		// JSON Payload lesen
 		const body = await req.json();
+		console.log("Received payload:", JSON.stringify(body));
 		const item = body.items?.[0];
 
 		if (!item) {
@@ -21,6 +22,7 @@ export async function POST(req) {
 
 		const { properties, price, id } = item;
 
+		console.log(properties);
 		// dynamischer Preis → convert to shopify price format
 		const formattedPrice = (price / 100).toFixed(2);
 
@@ -32,40 +34,76 @@ export async function POST(req) {
 		const graphqlClient = new shopifyServer.clients.Graphql({ session: adminSession });
 
 		// 1. Variante erstellen via GraphQL
-		const createMutation = `
-            mutation productVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-                productVariantsBulkCreate(productId: $productId, variants: $variants) {
-                    productVariants {
-                        id
-                        legacyResourceId
-                        inventoryItem {
-                            id
-                        }
-                    }
-                    userErrors {
-                        field
-                        message
-                    }
-                }
-            }
-        `;
 
-		const variantTitle = "dynamic_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+		let variantTitle = Date.now() + ""; // Default Titel mit Timestamp, falls keine Eigenschaften vorhanden sind
+
+		if (properties.Montage != "Nein") {
+			variantTitle += " - mit Montage";
+		}
+
+		if (properties.Montage == "Nein") {
+			variantTitle += " - ohne Montage";
+		}
+
+		if (properties.Verpackungsrücknahme == "Ja") {
+			variantTitle += " - mit Verpackungsrücknahme";
+		}
+
+		if (properties.Verpackungsrücknahme == "Nein") {
+			variantTitle += " - ohne Verpackungsrücknahme";
+		}
+
 		const createResponse = await graphqlClient.query({
 			data: {
-				query: createMutation,
+				query: `
+					mutation productVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+						productVariantsBulkCreate(productId: $productId, variants: $variants) {
+							product {
+								id
+							}
+							productVariants {
+								id
+								legacyResourceId
+								inventoryPolicy
+								inventoryItem {
+									id
+									tracked
+								}
+								metafields(first: 1) {
+									edges {
+										node {
+										namespace
+										key
+										value
+										}
+									}
+								}
+							}
+							userErrors {
+								field
+								message
+							}
+						}
+					}
+				`,
 				variables: {
 					productId: `gid://shopify/Product/${id}`,
 					variants: [
 						{
-							optionValues: [{ optionName: "Title", name: variantTitle }],
 							price: formattedPrice,
 							inventoryPolicy: "CONTINUE",
 							inventoryItem: {
 								tracked: false,
-								sku: "srv_" + variantTitle,
-								requiresShipping: false,
 							},
+							optionValues: [{ optionName: "Title", name: variantTitle }],
+							metafields: [
+								{
+									namespace: "custom",
+									key: "json_properties",
+									value: JSON.stringify(properties || {}),
+									type: "multi_line_text_field",
+								},
+							],
 						},
 					],
 				},
@@ -73,76 +111,6 @@ export async function POST(req) {
 		});
 
 		const createdVariant = createResponse.body.data.productVariantsBulkCreate.productVariants[0];
-		const inventoryItemId = createdVariant.inventoryItem.id; // bereits im Query enthalten
-
-		// Inventory Level aktivieren
-		const inventoryMutation = `
-    mutation inventoryBulkToggleActivation($inventoryItemId: ID!, $inventoryItemUpdates: [InventoryBulkToggleActivationInput!]!) {
-        inventoryBulkToggleActivation(inventoryItemId: $inventoryItemId, inventoryItemUpdates: $inventoryItemUpdates) {
-            inventoryItem {
-                id
-            }
-            inventoryLevels {
-                quantities(names: ["available"]) {
-                    quantity
-                }
-            }
-            userErrors {
-                field
-                message
-            }
-        }
-    }
-`;
-
-		await graphqlClient.query({
-			data: {
-				query: inventoryMutation,
-				variables: {
-					inventoryItemId: inventoryItemId,
-					inventoryItemUpdates: [
-						{
-							locationId: `gid://shopify/Location/104671773052`,
-							activate: true,
-						},
-					],
-				},
-			},
-		});
-
-		// Bestand setzen
-		const setQuantityMutation = `
-		mutation inventorySetQuantities($input: InventorySetQuantitiesInput!) {
-			inventorySetQuantities(input: $input) {
-				inventoryAdjustmentGroup {
-					id
-				}
-				userErrors {
-					field
-					message
-				}
-			}
-		}
-	`;
-
-		await graphqlClient.query({
-			data: {
-				query: setQuantityMutation,
-				variables: {
-					input: {
-						name: "available",
-						reason: "correction",
-						quantities: [
-							{
-								inventoryItemId: inventoryItemId,
-								locationId: `gid://shopify/Location/104671773052`,
-								quantity: 999,
-							},
-						],
-					},
-				},
-			},
-		});
 
 		const userErrors = createResponse.body.data.productVariantsBulkCreate.userErrors;
 		if (userErrors.length > 0) {
@@ -152,61 +120,6 @@ export async function POST(req) {
 
 		//const createdVariant = createResponse.body.data.productVariantsBulkCreate.productVariants[0];
 		const variantLegacyId = createdVariant.legacyResourceId; // numerische ID für cart/add.js
-
-		// const adminRESTClient = new shopifyServer.clients.Rest({
-		// 	session: adminSession,
-		// });
-
-		// // Zufällige Option (jede Variante braucht eine eigene Option)
-		// const variantTitle = "dynamic_" + Date.now() + "_" + Math.random().toString(36).slice(2);
-
-		// // Variante erzeugen
-		// const createVariantResponse = await adminRESTClient.post({
-		// 	path: `products/${id}/variants.json`,
-		// 	data: {
-		// 		variant: {
-		// 			option1: variantTitle,
-		// 			price: formattedPrice,
-		// 			sku: "srv_" + variantTitle,
-
-		// 			// 🔧 WICHTIG:
-		// 			inventory_management: "shopify",
-		// 			inventory_policy: "continue", // erlaubt Kauf ohne Bestand
-		// 			fulfillment_service: "manual",
-		// 			requires_shipping: false,
-
-		// 			metafields: [
-		// 				{
-		// 					namespace: "custom",
-		// 					key: "dynamic",
-		// 					value: "true",
-		// 					type: "boolean",
-		// 				},
-		// 				{
-		// 					namespace: "custom",
-		// 					key: "json_properties",
-		// 					value: JSON.stringify(properties || {}),
-		// 					type: "single_line_text_field",
-		// 				},
-		// 			],
-		// 		},
-		// 	},
-		// 	type: "application/json",
-		// });
-
-		// const createdVariant = createVariantResponse.body.variant;
-		// const locationId = 104671773052;
-
-		// const set_inventory_response = await adminRESTClient.post({
-		// 	path: "inventory_levels/set.json",
-		// 	data: {
-		// 		location_id: locationId,
-		// 		inventory_item_id: createdVariant.inventory_item_id,
-		// 		available: 999,
-		// 	},
-		// 	type: "application/json",
-		// });
-		// console.log("Set inventory level response:", JSON.stringify(set_inventory_response.body));
 
 		return NextResponse.json(
 			{ ok: true, variantId: variantLegacyId, price, properties },
